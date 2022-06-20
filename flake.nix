@@ -6,7 +6,7 @@
     in {
       devShells.${system}.default = pkgs.mkShell {
         nativeBuildInputs =
-          [ (pkgs.python310.withPackages (ps: [ ps.requests ])) ];
+          [ (pkgs.python310.withPackages (ps: [ ps.requests ps.pwntools ])) ];
       };
     };
 }
