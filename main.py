@@ -69,6 +69,7 @@ def main():
     with ssh(user="hacker", host="dojo.pwn.college", ssh_agent=True) as tube:
         print("Running exploit...")
         challenge.exploit(tube)
+    print("Done")
 
 
 if __name__ == "__main__":
