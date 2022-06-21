@@ -72,7 +72,7 @@ class BadSSHClient:
         return BadSSHTube(sess)
     
 def is_valid_flag(flag):
-    return re.fullmatch(r"^pwn.college{([a-zA-Z0-9.]+)}$", flag) is not None
+    return re.fullmatch(r"^pwn.college{([a-zA-Z0-9.\-_]+)}$", flag) is not None
 
 
 def solve_level(client, level, do_start=True):
