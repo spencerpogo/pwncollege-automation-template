@@ -78,7 +78,7 @@ def is_valid_flag(flag):
 def solve_level(client, level, do_start=True):
     if do_start:
         print("Starting docker...")
-        level.start(client, practice=True)
+        level.start(client, practice=False)
     print("Connecting via SSH...")
     ssh = BadSSHClient("hacker", "dojo.pwn.college")
     print("Exploiting...")
