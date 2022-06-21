@@ -23,12 +23,3 @@ class Challenge:
     @abstractstaticmethod
     def exploit(tube):
         pass
-
-def basic_challenge(chall_id, cmd):
-    class BasicChall(Challenge):
-        challenge_id = chall_id
-        def exploit(self, client):
-            r = client.invoke_shell()
-            r.sendline(cmd)
-            return r.recvall().strip().split(b"\n")[-1].decode()
-    return BasicChall
