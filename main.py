@@ -56,6 +56,9 @@ class BadSSHClient:
         self.transport = self.client.get_transport()
         self.transport.use_compression(True)
     
+    def close(self):
+        self.client.close()
+    
     def exec_command(self, cmd):
         sess = self.transport.open_session()
         sess.set_combine_stderr(True)
@@ -70,6 +73,23 @@ class BadSSHClient:
     
 def is_valid_flag(flag):
     return re.fullmatch(r"^pwn.college{([a-zA-Z0-9.]+)}$", flag) is not None
+
+
+def solve_level(client, level, do_start=True):
+    if do_start:
+        print("Starting docker...")
+        level.start(client, practice=True)
+    print("Connecting via SSH...")
+    ssh = BadSSHClient("hacker", "dojo.pwn.college")
+    print("Exploiting...")
+    flag = level.exploit(ssh)
+    if not is_valid_flag(flag):
+        raise AssertionError(f"Invalid flag returned, broken exploit: {flag!r}")
+    print("Got flag:", flag)
+    if not client.logged_in:
+        level.submit_flag(flag)
+    print("Level done")
+    ssh.close()
 
 
 def main():
@@ -95,25 +115,12 @@ def main():
         sys.exit(1)
 
     do_start = "--no-start" not in args
-
-    print(f"pwn.college {module_name} level{level}")
     client = PwncollegeClient()
-    if do_start:
-        print("Logging in...")
-        client.login(
-            os.environ["PWNCOLLEGE_USERNAME"], os.environ["PWNCOLLEGE_PASSWORD"]
-        )
-        print("Starting docker...")
-        level.start_docker(client, practice=True)
-    print("Connecting via SSH...")
-    client = BadSSHClient("hacker", "dojo.pwn.college")
-    print("Exploiting...")
-    flag = level.exploit(client)
-    if not is_valid_flag(flag):
-        raise AssertionError(f"Invalid flag returned, broken exploit: {flag!r}")
-    print(flag)
-    print("Done")
-    client.close()
+    client.login(
+        os.environ["PWNCOLLEGE_USERNAME"], os.environ["PWNCOLLEGE_PASSWORD"]
+    )
+    print(f"pwn.college {module_name} level{level}")
+    solve_level(client, level, do_start=do_start)
 
 
 if __name__ == "__main__":
