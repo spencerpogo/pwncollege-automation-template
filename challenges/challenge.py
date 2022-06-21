@@ -1,6 +1,7 @@
 from client import PwncollegeClient
 from abc import abstractclassmethod, abstractstaticmethod
 
+
 class Challenge:
     SSH_USER = "hacker"
     SSH_HOST = "dojo.pwn.college"
@@ -15,7 +16,7 @@ class Challenge:
 
     def start(self, client: PwncollegeClient, practice=False):
         client.start_docker(self.challenge_id, practice=practice)
-    
+
     @abstractstaticmethod
     def exploit(tube):
         pass

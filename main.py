@@ -1,17 +1,76 @@
 import os
 import sys
-import logging
-import inspect
+import re
 
 from client import PwncollegeClient
 from challenges import MODULES
 
+from pwnlib.tubes.sock import sock
 from pwn import *
+import paramiko
 
-#logging.basicConfig(level=logging.DEBUG)
-#logging.getLogger("paramiko").setLevel(logging.DEBUG)
-#logging.getLogger("paramiko.transport").setLevel(logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
+# logging.getLogger("paramiko").setLevel(logging.DEBUG)
+# logging.getLogger("paramiko.transport").setLevel(logging.DEBUG)
 context.log_level = "DEBUG"
+
+class BadSSHTube(sock):
+    def __init__(self, sock):
+        super(BadSSHTube, self).__init__()
+        self.sock = sock
+    
+    def _close_msg(self):
+        self.info("Closed SSH Channel")
+
+
+class BadSSHClient:
+    def __init__(self, user, host):
+        config_file = os.path.expanduser("~/.ssh/config")
+        keyfile = None
+        if os.path.exists(config_file):
+            ssh_config = paramiko.SSHConfig()
+            ssh_config.parse(open(config_file))
+            host_config = ssh_config.lookup(host)
+            if "identityfile" in host_config:
+                keyfile = host_config["identityfile"][0]
+                if keyfile.lower() == "none":
+                    keyfile = None
+        keyfiles = [os.path.expanduser(keyfile)] if keyfile else []
+
+        self.client = paramiko.SSHClient()
+        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        known_hosts = os.path.expanduser("~/.ssh/known_hosts")
+        if os.path.exists(known_hosts):
+            self.client.load_host_keys(known_hosts)
+
+        self.client.connect(
+            host,
+            22,
+            user,
+            password=None,
+            key_filename=keyfiles,
+            allow_agent=True,
+            compress=True,
+            look_for_keys=True,
+        )
+        self.transport = self.client.get_transport()
+        self.transport.use_compression(True)
+    
+    def exec_command(self, cmd):
+        sess = self.transport.open_session()
+        sess.set_combine_stderr(True)
+        sess.exec_command(cmd)
+        return BadSSHTube(sess)
+    
+    def invoke_shell(self):
+        sess = self.transport.open_session()
+        sess.set_combine_stderr(True)
+        sess.invoke_shell()
+        return BadSSHTube(sess)
+    
+def is_valid_flag(flag):
+    return re.fullmatch(r"^pwn.college{([a-zA-Z0-9.]+)}$", flag) is not None
+
 
 def main():
     args = sys.argv[1:]
@@ -26,11 +85,13 @@ def main():
         print(f"Module not found: {module_name!r}", file=sys.stderr)
         print(f"Available modules: {', '.join(map(repr, MODULES.keys()))}")
         sys.exit(1)
-    print(levels)
     try:
-        challenge = levels[level - 1]
+        level = levels[level - 1]
     except IndexError:
-        print(f"Level {level!r} not found out of {len(levels)} levels in challenge {challenge_name!r}", file=sys.stderr)
+        print(
+            f"Level {level!r} not found out of {len(levels)} levels in module {module_name!r}",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     do_start = "--no-start" not in args
@@ -39,37 +100,20 @@ def main():
     client = PwncollegeClient()
     if do_start:
         print("Logging in...")
-        client.login(os.environ["PWNCOLLEGE_USERNAME"], os.environ["PWNCOLLEGE_PASSWORD"])
+        client.login(
+            os.environ["PWNCOLLEGE_USERNAME"], os.environ["PWNCOLLEGE_PASSWORD"]
+        )
         print("Starting docker...")
-        challenge.start_docker(client, practice=True)
+        level.start_docker(client, practice=True)
     print("Connecting via SSH...")
-    # pwn.college specific HACK
-    def _hack_pwd(self):
-        d = self.run("pwd", tty=False).recvall().strip()
-        print("PWD!!", d)
-        return d
-    ssh.pwd = _hack_pwd
-
-    old_process = ssh.process
-    def _hack_process(self, argv=None, *a, **kw):
-        if argv == "false":
-            raise AssertionError("Don't try it! This hangs!")
-        return old_process(*a, **kw)
-    ssh.process = _hack_process
-
-    # hack for debug
-    _old_context_local = type(context).local
-    def _ctx_local_hack(*a, **kw):
-        if kw.get("log_level") == "error":
-            print("CAUGHT SNEAKY STUFF")
-            kw["log_level"] = "debug"
-        return _old_context_local(*a, **kw)
-    type(context).local = _ctx_local_hack
-
-    with ssh(user="hacker", host="dojo.pwn.college", ssh_agent=True) as tube:
-        print("Running exploit...")
-        challenge.exploit(tube)
+    client = BadSSHClient("hacker", "dojo.pwn.college")
+    print("Exploiting...")
+    flag = level.exploit(client)
+    if not is_valid_flag(flag):
+        raise AssertionError(f"Invalid flag returned, broken exploit: {flag!r}")
+    print(flag)
     print("Done")
+    client.close()
 
 
 if __name__ == "__main__":
