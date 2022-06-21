@@ -1,6 +1,9 @@
 from requests import Session
 import re
 
+class AlreadySolvedException(Exception):
+    pass
+
 
 class PwncollegeClient(object):
     BASE_URL = "https://dojo.pwn.college"
@@ -52,6 +55,7 @@ class PwncollegeClient(object):
                 "nonce": self._get_nonce("/login")
             },
         )
+        # refresh nonce since logging-in changes the session and therefore the nonce
         self.nonce = self._get_nonce("/")
         self.logged_in = True
 
@@ -69,8 +73,12 @@ class PwncollegeClient(object):
             )
 
     def submit_flag(self, challenge_id, flag):
-        r = self._make_request("/api/v1/challenges/attempt", {"challenge_id": challenge_id, "submission": flag})
+        r = self._make_json_request("/api/v1/challenges/attempt", {"challenge_id": challenge_id, "submission": flag})
         data = r.json()
         if data["success"] != True:
             raise AssertionError(f"Flag submission unsucessful: {data!r}")
-        print(data)
+        status = data.get("data", {}).get("status")
+        if status == "already_solved":
+            raise AlreadySolvedException()
+        if status != "correct":
+            raise AssertionError(f"Flag submission unsucessful: {data!r}")

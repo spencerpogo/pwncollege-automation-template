@@ -2,7 +2,7 @@ import os
 import sys
 import re
 
-from client import PwncollegeClient
+from client import PwncollegeClient, AlreadySolvedException
 from challenges import MODULES
 
 from pwnlib.tubes.sock import sock
@@ -86,8 +86,10 @@ def solve_level(client, level, do_start=True):
     if not is_valid_flag(flag):
         raise AssertionError(f"Invalid flag returned, broken exploit: {flag!r}")
     print("Got flag:", flag)
-    if not client.logged_in:
-        level.submit_flag(flag)
+    try:
+        level.submit_flag(client, flag)
+    except AlreadySolvedException:
+        print("Already solved")
     print("Level done")
     ssh.close()
 

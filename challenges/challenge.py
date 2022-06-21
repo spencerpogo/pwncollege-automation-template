@@ -16,6 +16,9 @@ class Challenge:
 
     def start(self, client: PwncollegeClient, practice=False):
         client.start_docker(self.challenge_id, practice=practice)
+    
+    def submit_flag(self, client: PwncollegeClient, flag):
+        client.submit_flag(self.challenge_id, flag)
 
     @abstractstaticmethod
     def exploit(tube):
